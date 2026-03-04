@@ -61,9 +61,10 @@ def hypothesis_test_calculation(X, alpha, mu, alternative):
     
     return result
  
+
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return "<h1>The Statistical Analysis Engine is Live!</h1><p>Add /test to the URL to use the API.</p>"
  
 @app.route('/test', methods=['POST'])
 def test():
