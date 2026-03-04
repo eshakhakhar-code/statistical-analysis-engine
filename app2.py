@@ -1,11 +1,11 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, jsonify, render_template_string
 from scipy.stats import t
 import numpy as np
 from statistics import stdev
 import json
- 
+
 app = Flask(__name__)
- 
+
 def hypothesis_test_calculation(X, alpha, mu, alternative):
     """
     Perform hypothesis test and return results as dictionary
@@ -60,12 +60,103 @@ def hypothesis_test_calculation(X, alpha, mu, alternative):
         result['rejection_region'] = f't < {round(t_table_neg, 4)} or t > {round(t_table_pos, 4)}'
     
     return result
- 
 
-@app.route('/')
-def index():
-    return "<h1>The Statistical Analysis Engine is Live!</h1><p>Add /test to the URL to use the API.</p>"
- 
+# --- FRONTEND HTML CODE ---
+FRONTEND_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hypothesis Tester</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background-color: #f9f9fa; color: #333; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: #2c3e50; }
+        label { font-weight: bold; display: block; margin-top: 15px; margin-bottom: 5px; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
+        button { margin-top: 20px; width: 100%; padding: 12px; background-color: #007aff; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        button:hover { background-color: #005bb5; }
+        #result-box { margin-top: 25px; padding: 20px; border-radius: 5px; display: none; background-color: #e8f4fd; border-left: 5px solid #007aff; }
+        .error { background-color: #fde8e8; border-left-color: #ff3b30; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>📊 Statistical Analysis Engine</h2>
+        <p>Enter your dataset below to run a One-Sample T-Test.</p>
+        
+        <form id="statForm">
+            <label>Data Points (comma or space separated):</label>
+            <textarea name="data" rows="3" placeholder="e.g. 12.5, 14.1, 11.8, 13.2" required></textarea>
+
+            <label>Population Mean (mu):</label>
+            <input type="number" step="any" name="mu" value="0" required>
+
+            <label>Significance Level (Alpha):</label>
+            <input type="number" step="any" name="alpha" value="0.05" required>
+
+            <label>Alternative Hypothesis:</label>
+            <select name="alternative">
+                <option value="two-sided">Two-sided</option>
+                <option value="greater">Greater</option>
+                <option value="less">Less</option>
+            </select>
+
+            <button type="submit">Calculate T-Test</button>
+        </form>
+
+        <div id="result-box"></div>
+    </div>
+
+    <script>
+        document.getElementById('statForm').addEventListener('submit', async function(e) {
+            e.preventDefault(); // Prevent page reload
+            
+            const resultBox = document.getElementById('result-box');
+            resultBox.style.display = 'block';
+            resultBox.className = ''; 
+            resultBox.innerHTML = 'Calculating...';
+
+            const formData = new FormData(this);
+
+            try {
+                // Send data to the Python backend
+                const response = await fetch('/test', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+
+                if (data.error) {
+                    resultBox.className = 'error';
+                    resultBox.innerHTML = `<strong>Error:</strong> ${data.error}`;
+                } else {
+                    // Display success results
+                    resultBox.innerHTML = `
+                        <h3 style="margin-top:0;">Result: ${data.conclusion}</h3>
+                        <strong>P-Value:</strong> ${data.p_value} <br>
+                        <strong>T-Calculated:</strong> ${data.t_calculated} <br>
+                        <strong>Sample Mean:</strong> ${data.mean} <br>
+                        <strong>Degrees of Freedom:</strong> ${data.df}
+                    `;
+                }
+            } catch (err) {
+                resultBox.className = 'error';
+                resultBox.innerHTML = `<strong>Server Error:</strong> Could not connect to the API.`;
+            }
+        });
+    </script>
+</body>
+</html>
+"""
+
+@app.route("/")
+def home():
+    # This serves the HTML block above directly to the browser
+    return render_template_string(FRONTEND_HTML)
+
 @app.route('/test', methods=['POST'])
 def test():
     try:
@@ -102,7 +193,6 @@ def test():
         return jsonify({'error': f'Invalid number format: {str(e)}'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
- 
+
 if __name__ == '__main__':
     app.run(debug=True)
- 
